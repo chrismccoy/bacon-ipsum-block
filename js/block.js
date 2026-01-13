@@ -1,5 +1,11 @@
 /**
  * Bacon Ipsum Block
+ *
+ * A WordPress Gutenberg block that generates bacon-themed lorem ipsum text
+ * via the baconipsum.com API. Built using vanilla JavaScript with no build step.
+ *
+ * @package BaconIpsumBlock
+ * @since   1.0.0
  */
 
 (function (wp) {
@@ -44,9 +50,19 @@
     var __ = wp.i18n.__;
 
     /**
-     * Base URL for the Bacon Ipsum API.
+     * Get plugin configuration from localized script data.
+     * Falls back to defaults if not available.
      */
-    var API_BASE_URL = 'https://baconipsum.com/api/';
+    var config = window.baconIpsumConfig || {
+        apiUrl: 'https://baconipsum.com/api/',
+        version: '1.0.0'
+    };
+
+    /**
+     * Base URL for the Bacon Ipsum API.
+     * Uses localized config value for flexibility.
+     */
+    var API_BASE_URL = config.apiUrl;
 
     /**
      * Block icon SVG element.
@@ -80,6 +96,14 @@
 
     /**
      * Fetches bacon ipsum text from the Bacon Ipsum API.
+     *
+     * Makes an HTTP request to the Bacon Ipsum API with the specified parameters
+     * and returns the generated text as a promise.
+     *
+     * @param {string}  type           Type of text: 'all-meat' or 'meat-and-filler'.
+     * @param {number}  paras          Number of paragraphs to generate (1-10).
+     * @param {boolean} startWithLorem Whether to start with "Bacon ipsum dolor sit amet".
+     * @return {Promise<Array>} Promise that resolves to array of paragraph strings.
      */
     function fetchBaconIpsum(type, paras, startWithLorem) {
         var url = API_BASE_URL + '?format=json';
@@ -90,14 +114,23 @@
             url += '&start-with-lorem=1';
         }
 
-        return fetch(url).then(function (response) {
-            if (!response.ok) {
-                throw new Error(
-                    'API request failed with status: ' + response.status
-                );
-            }
-            return response.json();
-        });
+        return fetch(url)
+            .then(function (response) {
+                if (!response.ok) {
+                    var errorMsg = 'API request failed with status: ' + response.status;
+                    console.error('[Bacon Ipsum Block] ' + errorMsg, {
+                        url: url,
+                        status: response.status,
+                        statusText: response.statusText
+                    });
+                    throw new Error(errorMsg);
+                }
+                return response.json();
+            })
+            .catch(function (error) {
+                console.error('[Bacon Ipsum Block] Error fetching bacon ipsum:', error);
+                throw error;
+            });
     }
 
     /**
@@ -105,8 +138,16 @@
      *
      * Takes the API response array and converts it to an HTML string
      * with each paragraph wrapped in <p> tags for use with RichText.
+     *
+     * @param {Array<string>} paragraphs Array of paragraph strings from API.
+     * @return {string} HTML string with paragraphs wrapped in <p> tags.
      */
     function paragraphsToHtml(paragraphs) {
+        if (!paragraphs || !Array.isArray(paragraphs)) {
+            console.warn('[Bacon Ipsum Block] Invalid paragraphs data:', paragraphs);
+            return '';
+        }
+
         return paragraphs
             .map(function (para) {
                 return '<p>' + para + '</p>';
@@ -120,6 +161,11 @@
      * This component renders the block interface in the WordPress editor,
      * including the placeholder for initial setup, the RichText content
      * display for editing, and the sidebar inspector controls.
+     *
+     * @param {Object} props                Component props from WordPress.
+     * @param {Object} props.attributes     Block attributes (type, paras, startWithLorem, content).
+     * @param {Function} props.setAttributes Function to update block attributes.
+     * @return {Object} React element for the block editor interface.
      */
     function BaconIpsumEdit(props) {
         var attributes = props.attributes;
@@ -165,11 +211,17 @@
                 .then(function (data) {
                     // Convert array to HTML string for RichText
                     var htmlContent = paragraphsToHtml(data);
-                    setAttributes({ content: htmlContent });
+
+                    if (htmlContent) {
+                        setAttributes({ content: htmlContent });
+                    } else {
+                        throw new Error('No content received from API');
+                    }
+
                     setIsLoading(false);
                 })
                 .catch(function (err) {
-                    setError(err.message);
+                    setError(err.message || 'Unknown error occurred');
                     setIsLoading(false);
                 });
         }
@@ -487,6 +539,10 @@
      * Outputs the static HTML content that will be saved to the post.
      * The content is fully editable via RichText in the editor and
      * persists even if the plugin is deactivated.
+     *
+     * @param {Object} props            Component props from WordPress.
+     * @param {Object} props.attributes Block attributes (content).
+     * @return {Object} React element for the saved block output.
      */
     function BaconIpsumSave(props) {
         var content = props.attributes.content;

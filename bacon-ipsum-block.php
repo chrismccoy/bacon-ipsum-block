@@ -6,59 +6,56 @@
  * Version:     1.0.0
  * Author:      Chris McCoy
  * Author URI:  https://github.com/chrismccoy
+ * License:     GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: bacon-ipsum
+ * Domain Path: /languages
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ *
+ * @package BaconIpsumBlock
  */
 
 // Prevent direct file access for security.
-defined('ABSPATH') || exit;
+defined( 'ABSPATH' ) || exit;
+
+// Define plugin constants.
+define( 'BACON_IPSUM_BLOCK_VERSION', '1.0.0' );
+define( 'BACON_IPSUM_BLOCK_FILE', __FILE__ );
+define( 'BACON_IPSUM_BLOCK_PATH', plugin_dir_path( __FILE__ ) );
+define( 'BACON_IPSUM_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Registers the Bacon Ipsum block and its assets.
+ * Load the main plugin class.
  */
-function bacon_ipsum_block_register() {
-    /*
-     * Register the editor script.
-     */
-    wp_register_script(
-        'bacon-ipsum-block-editor',
-        plugins_url('js/block.min.js', __FILE__),
-        array(
-            'wp-blocks',
-            'wp-element',
-            'wp-block-editor',
-            'wp-components',
-            'wp-i18n'
-        ),
-        '1.0',
-        true
-    );
+require_once BACON_IPSUM_BLOCK_PATH . 'includes/class-bacon-ipsum-block.php';
 
-    /*
-     * Register the block type.
-     */
-    register_block_type('bacon-ipsum/generator', array(
-        'editor_script' => 'bacon-ipsum-block-editor',
-        'attributes'    => array(
-            'type' => array(
-                'type'    => 'string',
-                'default' => 'all-meat',
-            ),
-            'paras' => array(
-                'type'    => 'number',
-                'default' => 3,
-            ),
-            'startWithLorem' => array(
-                'type'    => 'boolean',
-                'default' => true,
-            ),
-            'content' => array(
-                'type'     => 'string',
-                'source'   => 'html',
-                'selector' => '.bacon-ipsum-content',
-                'default'  => '',
-            ),
-        ),
-    ));
+/**
+ * Initialize the plugin.
+ *
+ * Returns the main instance of Bacon_Ipsum_Block to prevent the need
+ * to use globals and allows for proper encapsulation.
+ *
+ * @since 1.0.0
+ * @return Bacon_Ipsum_Block
+ */
+function bacon_ipsum_block() {
+	return Bacon_Ipsum_Block::instance( BACON_IPSUM_BLOCK_FILE );
 }
 
-add_action('init', 'bacon_ipsum_block_register');
+// Initialize the plugin.
+bacon_ipsum_block();
+
+/**
+ * Register activation hook.
+ *
+ * Runs when the plugin is activated via the WordPress admin.
+ */
+register_activation_hook( __FILE__, array( 'Bacon_Ipsum_Block', 'activate' ) );
+
+/**
+ * Register deactivation hook.
+ *
+ * Runs when the plugin is deactivated via the WordPress admin.
+ */
+register_deactivation_hook( __FILE__, array( 'Bacon_Ipsum_Block', 'deactivate' ) );
